@@ -1,0 +1,9 @@
+[submodule "frontend"]
+	path = frontend
+	url = https://github.com/3D-Western/dashboard-frontend.git
+[submodule "backend"]
+	path = backend
+	url = https://github.com/3D-Western/dashboard-backend.git
+[submodule "pipeline"]
+	path = pipeline
+	url = https://github.com/3D-Western/n8n-pipeline.git
