@@ -1,23 +1,23 @@
 services:
-  # Traefik
-  traefik:
-    image: traefik
-    restart: always 
-    command:
-      - "--api.insecure=true"
-      - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=false"
-      - "--entrypoints.web.address=:80"
-      - "--entrypoints.websecure.address=:443"
-      - "--certificateresolvers.mytlschallenge.acme.tlschallenge=true"
-      - "--certificateresolvers.mytlschallenge.acme.email=${SSL_EMAIL}" # TODO: check
-      - "--certificateresolvers.mytlschallenge.acme.storage=/letsencrypt/acem.json"
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - traefik_data:/letsencrypt
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+  # Traefik - COMMENTED OUT FOR MVP 
+  # traefik:
+  #   image: traefik
+  #   restart: always
+  #   command:
+  #     - "--api.insecure=true"
+  #     - "--providers.docker=true"
+  #     - "--providers.docker.exposedbydefault=false"
+  #     - "--entrypoints.web.address=:80"
+  #     - "--entrypoints.websecure.address=:443"
+  #     - "--certificateresolvers.mytlschallenge.acme.tlschallenge=true"
+  #     - "--certificateresolvers.mytlschallenge.acme.email=${SSL_EMAIL}" # TODO: check
+  #     - "--certificateresolvers.mytlschallenge.acme.storage=/letsencrypt/acem.json"
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - traefik_data:/letsencrypt
+  #     - /var/run/docker.sock:/var/run/docker.sock:ro
 
   # Postgres 
   n8n-queue-db:
@@ -52,12 +52,13 @@ services:
       - n8n-redis
     ports:
       - "5678:5678"
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.n8n.rule=Host(`n8n.domain.com`) # TODO: check domain!
-      - traefik.http.routers.n8n.tls=true
-      - traefik.http.routers.n8n.entrypoints=websecure
-      - traefik.http.routers.n8n.tls.certresolver=mytlschallenge
+    # Traefik labels commented out for MVP
+    # labels:
+    #   - traefik.enable=true
+    #   - traefik.http.routers.n8n.rule=Host(`n8n.domain.com`) # TODO: check domain!
+    #   - traefik.http.routers.n8n.tls=true
+    #   - traefik.http.routers.n8n.entrypoints=websecure
+    #   - traefik.http.routers.n8n.tls.certresolver=mytlschallenge
     environment:
       # key for n8n
       - N8N_ENCRYPTION_KEY=6KKZImfmUwJc6EkIVGN/iTVQXsSUqTV3
@@ -81,25 +82,26 @@ services:
       - ./volumes/outputs:/data/outputs
       - /var/run/docker.sock:/var/run/docker.sock 
 
-  # webhook container 
+  # webhook container
   n8n-webhook:
-    user: root # TODO: check this 
+    user: root # TODO: check this
     build:
       context: .
-        dockerfile: Dockerfile # TODO: check this 
-        args:
-          N8N_STABLE: 2.3.1 
-          N8N_LATEST_VERSION: latest 
+      dockerfile: Dockerfile # TODO: check this
+      args:
+        N8N_STABLE: 2.3.1
+        N8N_LATEST_VERSION: latest
     command: webhook
     depends_on:
       - n8n-queue-db
       - n8n-redis
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.webhook.rule=Host(`n8n.domain.com`) && PathPrefix(`/webhook`) # TODO: check domain! 
-      - traefik.http.routers.webhook.tls=true
-      - traefik.http.routers.webhook.tls.certresolver=mytlschallenge
-      - traefik.http.routers.webhook.priority=100
+    # Traefik labels commented out for MVP
+    # labels:
+    #   - traefik.enable=true
+    #   - traefik.http.routers.webhook.rule=Host(`n8n.domain.com`) && PathPrefix(`/webhook`) # TODO: check domain!
+    #   - traefik.http.routers.webhook.tls=true
+    #   - traefik.http.routers.webhook.tls.certresolver=mytlschallenge
+    #   - traefik.http.routers.webhook.priority=100
     environment:
       - N8N_ENCRYPTION_KEY=6KKZImfmUwJc6EkIVGN/iTVQXsSUqTV3
       - DB_TYPE=postgresdb
