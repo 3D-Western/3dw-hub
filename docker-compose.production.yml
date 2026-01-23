@@ -1,0 +1,179 @@
+services:
+  # Traefik - COMMENTED OUT FOR MVP 
+  # traefik:
+  #   image: traefik
+  #   restart: always
+  #   command:
+  #     - "--api.insecure=true"
+  #     - "--providers.docker=true"
+  #     - "--providers.docker.exposedbydefault=false"
+  #     - "--entrypoints.web.address=:80"
+  #     - "--entrypoints.websecure.address=:443"
+  #     - "--certificateresolvers.mytlschallenge.acme.tlschallenge=true"
+  #     - "--certificateresolvers.mytlschallenge.acme.email=${SSL_EMAIL}" # TODO: check
+  #     - "--certificateresolvers.mytlschallenge.acme.storage=/letsencrypt/acem.json"
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - traefik_data:/letsencrypt
+  #     - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  # Postgres
+  n8n-queue-db:
+    image: postgres:16.1
+    container_name: n8n-queue-db
+    restart: always
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # Redis 
+  n8n-redis:
+    image: redis:7-alpine 
+    container_name: n8n-redis 
+    restart: always 
+    volumes:
+      - redis_data:/data
+
+  n8n-main:
+    user: root
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        N8N_STABLE: 2.3.1
+        N8N_LATEST_VERSION: latest
+    depends_on:
+      - n8n-queue-db
+      - n8n-redis
+    ports:
+      - "5678:5678"
+    # Traefik labels commented out for MVP
+    # labels:
+    #   - traefik.enable=true
+    #   - traefik.http.routers.n8n.rule=Host(`n8n.domain.com`) # TODO: check domain!
+    #   - traefik.http.routers.n8n.tls=true
+    #   - traefik.http.routers.n8n.entrypoints=websecure
+    #   - traefik.http.routers.n8n.tls.certresolver=mytlschallenge
+    environment:
+      # key for n8n
+      - N8N_ENCRYPTION_KEY=${N8N_KEY}
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_DATABASE=${POSTGRES_DB}
+      - DB_POSTGRESDB_HOST=n8n-queue-db
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_USER=${POSTGRES_USER}
+      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
+      - EXECUTIONS_MODE=queue
+      - QUEUE_BULL_REDIS_HOST=n8n-redis
+      - QUEUE_BULL_REDIS_PORT=6379
+      - QUEUE_BULL_REDIS_DB=0
+      - N8N_DISABLE_PRODUCTION_MAIN_PROCESS=true # disable webhook on main process for webhook containers and processes
+      - WEBHOOK_URL=${WEBHOOK_URL} 
+      - N8N_PROXY_HOPS=1
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./test_assets/3d_models:/data/inputs
+      - ./test_assets/extra_files:/data/infiles
+      - ./volumes/outputs:/data/outputs
+      - /var/run/docker.sock:/var/run/docker.sock 
+
+  # webhook container
+  n8n-webhook:
+    user: root # TODO: check this
+    build:
+      context: .
+      dockerfile: Dockerfile # TODO: check this
+      args:
+        N8N_STABLE: 2.3.1
+        N8N_LATEST_VERSION: latest
+    command: webhook
+    depends_on:
+      - n8n-queue-db
+      - n8n-redis
+    # Traefik labels commented out for MVP
+    # labels:
+    #   - traefik.enable=true
+    #   - traefik.http.routers.webhook.rule=Host(`n8n.domain.com`) && PathPrefix(`/webhook`) # TODO: check domain!
+    #   - traefik.http.routers.webhook.tls=true
+    #   - traefik.http.routers.webhook.tls.certresolver=mytlschallenge
+    #   - traefik.http.routers.webhook.priority=100
+    environment:
+      - N8N_ENCRYPTION_KEY=${N8N_KEY}
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_DATABASE=${POSTGRES_DB}
+      - DB_POSTGRESDB_HOST=n8n-queue-db
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_USER=${POSTGRES_USER}
+      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
+      - EXECUTIONS_MODE=queue
+      - QUEUE_BULL_REDIS_HOST=n8n-redis
+      - QUEUE_BULL_REDIS_PORT=6379
+      - QUEUE_BULL_REDIS_DB=0
+      - WEBHOOK_URL=${WEBHOOK_URL} 
+    volumes:
+      - n8n_data:/home/node/.n8n
+      # TODO: is infiles needed for webhook container?
+      - ./test_assets/3d_models:/data/inputs
+      - ./test_assets/extra_files:/data/infiles
+      - ./volumes/outputs:/data/outputs
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  # worker container 
+  n8n-worker-1:
+    user: root
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        N8N_STABLE: 2.3.1
+        N8N_LATEST_VERSION: latest
+    command: worker
+    depends_on:
+      - n8n-queue-db
+      - n8n-redis
+    environment:
+      # key for n8n
+      - N8N_ENCRYPTION_KEY=${N8N_KEY}
+      # DB config
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_DATABASE=${POSTGRES_DB}
+      - DB_POSTGRESDB_HOST=n8n-queue-db
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_USER=${POSTGRES_USER}
+      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
+      # queue mode config
+      - EXECUTIONS_MODE=queue
+      # Redis config
+      - QUEUE_BULL_REDIS_HOST=n8n-redis
+      - QUEUE_BULL_REDIS_PORT=6379
+      - QUEUE_BULL_REDIS_DB=0
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./test_assets/3d_models:/data/inputs
+      - ./test_assets/extra_files:/data/infiles
+      - ./volumes/outputs:/data/outputs
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  # OrcaSlicer for slicing STL files
+  orcaslicer:
+    build:
+      context: .
+      dockerfile: Dockerfile.orcaslicer
+      args:
+        OS_VER: "2.3.1"
+    container_name: n8n-pipeline-orcaslicer-1
+    restart: unless-stopped
+    volumes:
+      - ./test_assets/3d_models:/data/inputs
+      - ./test_assets/extra_files:/data/infiles
+      - ./volumes/outputs:/data/outputs
+
+volumes:
+  n8n_data: # named volume for persistent data 
+  redis_data:
+  postgres_data:
