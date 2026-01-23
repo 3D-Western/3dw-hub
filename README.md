@@ -57,7 +57,7 @@ git push
 
 ### Daily Workflow
 
-#### Pulling Latest Changes (from others)
+#### Pulling Latest Changes (from remote)
 
 ```bash
 # Pull parent repo changes
