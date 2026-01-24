@@ -1,0 +1,416 @@
+services:
+  # Traefik Reverse Proxy
+  traefik:
+    image: traefik:v3.0
+    container_name: traefik
+    restart: unless-stopped
+    command:
+      - "--api.insecure=true"
+      - "--api.dashboard=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--log.level=DEBUG"
+    ports:
+      - "80:80"
+      - "8081:8080" # Traefik dashboard
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - traefik-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # MariaDB Database (for Backend)
+  mariadb:
+    image: mariadb:11.2
+    container_name: mariadb
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    networks:
+      - backend-network
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # PostgreSQL Database (for N8N)
+  postgres:
+    image: postgres:16.1
+    container_name: postgres
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - pipeline-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Redis (for N8N Queue)
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks:
+      - pipeline-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Backend (Spring Boot)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: backend
+    restart: unless-stopped
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      SPRING_MARIADB_URL: mariadb
+      SPRING_MARIADB_PORT: 3306
+      SPRING_PORT: 8000
+    networks:
+      - backend-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Frontend (Next.js)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    env_file:
+      - .env
+    environment:
+      NEXT_BACKEND_URL: http://backend:8000
+      API_URL: http://backend:8000
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=Host(`${FRONTEND_DOMAIN}`)"
+      - "traefik.http.routers.frontend.entrypoints=web"
+      - "traefik.http.services.frontend.loadbalancer.server.port=3000"
+    networks:
+      - traefik-network
+      - backend-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # N8N Main (UI/API)
+  n8n-main:
+    build:
+      context: ./pipeline
+      dockerfile: Dockerfile
+      args:
+        N8N_STABLE: 2.3.1
+        N8N_LATEST_VERSION: latest
+    container_name: n8n-main
+    user: root
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      traefik:
+        condition: service_started
+    env_file:
+      - .env
+    environment:
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_PORT: 5432
+      EXECUTIONS_MODE: queue
+      QUEUE_BULL_REDIS_HOST: redis
+      QUEUE_BULL_REDIS_PORT: 6379
+      QUEUE_BULL_REDIS_DB: 0
+      N8N_DISABLE_PRODUCTION_MAIN_PROCESS: true
+      WEBHOOK_URL: http://${N8N_DOMAIN}
+      N8N_PROXY_HOPS: 1
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./test_assets/3d_models:/data/inputs
+      - ./test_assets/extra_files:/data/infiles
+      - ./volumes/outputs:/data/outputs
+      - /var/run/docker.sock:/var/run/docker.sock
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.n8n.rule=Host(`${N8N_DOMAIN}`)"
+      - "traefik.http.routers.n8n.entrypoints=web"
+      - "traefik.http.services.n8n.loadbalancer.server.port=5678"
+    networks:
+      - traefik-network
+      - pipeline-network
+      - seaweedfs-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # N8N Webhook Container
+  n8n-webhook:
+    build:
+      context: ./pipeline
+      dockerfile: Dockerfile
+      args:
+        N8N_STABLE: 2.3.1
+        N8N_LATEST_VERSION: latest
+    container_name: n8n-webhook
+    user: root
+    command: webhook
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_PORT: 5432
+      EXECUTIONS_MODE: queue
+      QUEUE_BULL_REDIS_HOST: redis
+      QUEUE_BULL_REDIS_PORT: 6379
+      QUEUE_BULL_REDIS_DB: 0
+      WEBHOOK_URL: http://${N8N_DOMAIN}
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./test_assets/3d_models:/data/inputs
+      - ./test_assets/extra_files:/data/infiles
+      - ./volumes/outputs:/data/outputs
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - pipeline-network
+      - seaweedfs-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # N8N Worker Container
+  n8n-worker:
+    build:
+      context: ./pipeline
+      dockerfile: Dockerfile
+      args:
+        N8N_STABLE: 2.3.1
+        N8N_LATEST_VERSION: latest
+    container_name: n8n-worker
+    user: root
+    command: worker
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_PORT: 5432
+      EXECUTIONS_MODE: queue
+      QUEUE_BULL_REDIS_HOST: redis
+      QUEUE_BULL_REDIS_PORT: 6379
+      QUEUE_BULL_REDIS_DB: 0
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./test_assets/3d_models:/data/inputs
+      - ./test_assets/extra_files:/data/infiles
+      - ./volumes/outputs:/data/outputs
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - pipeline-network
+      - seaweedfs-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # OrcaSlicer (3D Model Processing)
+  orcaslicer:
+    build:
+      context: ./pipeline
+      dockerfile: Dockerfile.orcaslicer
+      args:
+        OS_VER: 2.3.1
+    container_name: orcaslicer
+    restart: unless-stopped
+    volumes:
+      - ./test_assets/3d_models:/data/inputs
+      - ./test_assets/extra_files:/data/infiles
+      - ./volumes/outputs:/data/outputs
+    networks:
+      - pipeline-network
+      - seaweedfs-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # SeaweedFS Master (Metadata Management)
+  seaweedfs-master:
+    image: chrislusf/seaweedfs:latest
+    container_name: seaweedfs-master
+    restart: unless-stopped
+    ports:
+      - "9333:9333"
+      - "19333:19333"
+    command: "master -ip=seaweedfs-master -ip.bind=0.0.0.0"
+    volumes:
+      - seaweedfs_master_data:/data
+    networks:
+      - seaweedfs-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # SeaweedFS Volume (Data Storage)
+  seaweedfs-volume:
+    image: chrislusf/seaweedfs:latest
+    container_name: seaweedfs-volume
+    restart: unless-stopped
+    ports:
+      - "8082:8080"
+      - "18080:18080"
+    command: 'volume -ip=seaweedfs-volume -master="seaweedfs-master:9333" -ip.bind=0.0.0.0 -port=8080'
+    volumes:
+      - seaweedfs_volume_data:/data
+    depends_on:
+      - seaweedfs-master
+    networks:
+      - seaweedfs-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # SeaweedFS Filer (File System Interface)
+  seaweedfs-filer:
+    image: chrislusf/seaweedfs:latest
+    container_name: seaweedfs-filer
+    restart: unless-stopped
+    ports:
+      - "8888:8888"
+      - "18888:18888"
+    command: 'filer -ip=seaweedfs-filer -master="seaweedfs-master:9333" -ip.bind=0.0.0.0'
+    tty: true
+    stdin_open: true
+    volumes:
+      - seaweedfs_filer_data:/data
+    depends_on:
+      - seaweedfs-master
+      - seaweedfs-volume
+    networks:
+      - seaweedfs-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # SeaweedFS S3 (S3-Compatible API)
+  seaweedfs-s3:
+    image: chrislusf/seaweedfs:4.07
+    container_name: seaweedfs-s3
+    restart: unless-stopped
+    ports:
+      - "8333:8333"
+    command: 's3 -filer="seaweedfs-filer:8888" -ip.bind=0.0.0.0 -allowedOrigins=*'
+    depends_on:
+      - seaweedfs-master
+      - seaweedfs-volume
+      - seaweedfs-filer
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.seaweedfs-s3.rule=Host(`${SEAWEEDFS_S3_DOMAIN}`)"
+      - "traefik.http.routers.seaweedfs-s3.entrypoints=web"
+      - "traefik.http.services.seaweedfs-s3.loadbalancer.server.port=8333"
+      - "traefik.http.middlewares.seaweedfs-s3-cors.headers.accesscontrolallowmethods=GET,POST,PUT,DELETE,OPTIONS,HEAD"
+      - "traefik.http.middlewares.seaweedfs-s3-cors.headers.accesscontrolalloworiginlist=*"
+      - "traefik.http.middlewares.seaweedfs-s3-cors.headers.accesscontrolallowheaders=*"
+      - "traefik.http.middlewares.seaweedfs-s3-cors.headers.accesscontrolexposeheaders=*"
+      - "traefik.http.middlewares.seaweedfs-s3-cors.headers.accesscontrolmaxage=3600"
+      - "traefik.http.routers.seaweedfs-s3.middlewares=seaweedfs-s3-cors"
+    networks:
+      - seaweedfs-network
+      - traefik-network
+      - backend-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  traefik-network:
+    driver: bridge
+  backend-network:
+    driver: bridge
+  pipeline-network:
+    driver: bridge
+  seaweedfs-network:
+    driver: bridge
+
+volumes:
+  mariadb_data:
+  postgres_data:
+  redis_data:
+  n8n_data:
+  seaweedfs_master_data:
+  seaweedfs_volume_data:
+  seaweedfs_filer_data:
