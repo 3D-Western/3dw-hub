@@ -171,19 +171,15 @@ services:
       N8N_DISABLE_PRODUCTION_MAIN_PROCESS: true
       WEBHOOK_URL: http://${N8N_DOMAIN}
       N8N_PROXY_HOPS: 1
+    ports:
+      - "5678:5678"
     volumes:
       - n8n_data:/home/node/.n8n
       - ./test_assets/3d_models:/data/inputs
       - ./test_assets/extra_files:/data/infiles
       - ./volumes/outputs:/data/outputs
       - /var/run/docker.sock:/var/run/docker.sock
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.n8n.rule=Host(`${N8N_DOMAIN}`)"
-      - "traefik.http.routers.n8n.entrypoints=web"
-      - "traefik.http.services.n8n.loadbalancer.server.port=5678"
     networks:
-      - traefik-network
       - pipeline-network
       - seaweedfs-network
     logging:
