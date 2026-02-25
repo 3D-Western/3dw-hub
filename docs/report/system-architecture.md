@@ -177,52 +177,46 @@ sequenceDiagram
     participant PL as Pipeline (N8N)
     participant SES as AWS SES
 
-    rect rgb(173, 209, 255)
-        note over User, SES: Phase 1 — Job Submission
-        User->>FE: Select job type + fill form (material, quantity, notes)
-        FE->>BE: POST /api/v1/jobs (job metadata)
-        BE->>BE: Create job record (status: PENDING_FILE)
-        BE->>WFS: Generate presigned PUT URL
-        BE-->>FE: jobId + presignedUrl
+    note over User, SES: Phase 1 — Job Submission
+    User->>FE: Select job type + fill form (material, quantity, notes)
+    FE->>BE: POST /api/v1/jobs (job metadata)
+    BE->>BE: Create job record (status: PENDING_FILE)
+    BE->>WFS: Generate presigned PUT URL
+    BE-->>FE: jobId + presignedUrl
 
-        User->>FE: Attach model file
-        FE->>WFS: PUT file bytes via presigned URL
-        WFS-->>FE: 200 OK
+    User->>FE: Attach model file
+    FE->>WFS: PUT file bytes via presigned URL
+    WFS-->>FE: 200 OK
 
-        FE->>BE: POST /api/v1/jobs/{id}/complete-upload (checksum)
-        BE->>WFS: Retrieve and validate file (type, size, checksum)
-        BE->>S3: Move to permanent storage
-        BE->>BE: Update job status: IN_QUEUE
-        BE->>SES: Send job received confirmation
-        SES-->>User: Job received confirmation
-        BE-->>FE: Job status: IN_QUEUE
-    end
+    FE->>BE: POST /api/v1/jobs/{id}/complete-upload (checksum)
+    BE->>WFS: Retrieve and validate file (type, size, checksum)
+    BE->>S3: Move to permanent storage
+    BE->>BE: Update job status: IN_QUEUE
+    BE->>SES: Send job received confirmation
+    SES-->>User: Job received confirmation
+    BE-->>FE: Job status: IN_QUEUE
 
-    rect rgb(153, 225, 153)
-        note over User, SES: Phase 2 — Pipeline Processing (TBD)
-        BE->>PL: Hand off job (jobId, metadata, file reference)
-        BE->>BE: Update job status: PRINTING
+    note over User, SES: Phase 2 — Pipeline Processing (TBD)
+    BE->>PL: Hand off job (jobId, metadata, file reference)
+    BE->>BE: Update job status: PRINTING
 
-        PL->>S3: Fetch model file
-        note over PL: Slice model (OrcaSlicer)
-        note over PL: Send to printer / fabricate job
+    PL->>S3: Fetch model file
+    note over PL: Slice model (OrcaSlicer)
+    note over PL: Send to printer / fabricate job
 
-        PL->>BE: POST upload output 3MF file
-        BE->>S3: Store output file
-        PL->>BE: Update job status: READY
-        BE->>BE: Record status change in job_audit_logs
-        BE->>SES: Notify member job is ready
-        SES-->>User: Job is ready for pickup / download
-    end
+    PL->>BE: POST upload output 3MF file
+    BE->>S3: Store output file
+    PL->>BE: Update job status: READY
+    BE->>BE: Record status change in job_audit_logs
+    BE->>SES: Notify member job is ready
+    SES-->>User: Job is ready for pickup / download
 
-    rect rgb(255, 195, 140)
-        note over User, SES: Phase 3 — File Retrieval
-        User->>FE: Open completed job
-        FE->>BE: GET /api/v1/files/{id}/download
-        BE->>S3: Generate presigned GET URL
-        BE-->>FE: Presigned download URL
-        FE-->>User: Browser downloads file from S3
-    end
+    note over User, SES: Phase 3 — File Retrieval
+    User->>FE: Open completed job
+    FE->>BE: GET /api/v1/files/{id}/download
+    BE->>S3: Generate presigned GET URL
+    BE-->>FE: Presigned download URL
+    FE-->>User: Browser downloads file from S3
 ```
 
 ---
