@@ -6,7 +6,7 @@ This document is the entry point for reviewing the 3D Western dashboard. It is c
 
 ## 1. System Architecture Overview
 
-The platform is fully self-hosted and containerised on a local machine within the Western network. Traefik is the sole public ingress. File uploads use a two-stage flow: temporary staging in SeaweedFS, then permanent archival to AWS S3. All logins require mandatory email-based MFA.
+The core dashboard components, such as the client, backend, database and pipeline, are fully self-hosted and containerised on a local machine in the Digital Maker Space within the Western network. Traefik is the sole public ingress. File uploads use a two-stage flow: temporary staging in SeaweedFS, then permanent archival to AWS S3. All logins require mandatory email-based MFA.
 
 ```mermaid
 graph LR
@@ -67,6 +67,23 @@ graph LR
 | Redis                        | N8N job queue (Bull / FIFO)                                                           |
 
 For the full service spec, deployment configuration, and cost breakdown, see [resources.md](https://github.com/3D-Western/3dw-hub/blob/main/docs/report/resources.md).
+
+### Other Self-Hosted Services
+
+In addition to the dashboard, the following utilities are self-hosted for internal club use:
+
+| Service     | Role                                                                                      | Exposure                                      |
+| ----------- | ----------------------------------------------------------------------------------------- | --------------------------------------------- |
+| Vaultwarden | Self-hosted Bitwarden-compatible password manager for club executives and staff           | Exposed via Traefik; accessible over internet |
+
+Vaultwarden is routed through Traefik and requires internet-accessible exposure so executives and staff can reach it from outside the local Western network. This requires TLS termination at Traefik and an externally reachable domain, which we would like to discuss about, like with the self hosted dashboard.
+
+### Domain & Email Infrastructure
+
+| Provider   | Role                                                                                            |
+| ---------- | ----------------------------------------------------------------------------------------------- |
+| Hostinger  | Domain name registrar — holds the DNS records for the club's domain                            |
+| Namecheap  | Email hosting — provides club email addresses used for outbound SES identity and staff mailboxes |
 
 ---
 
@@ -150,7 +167,7 @@ For the detailed pipeline flowchart and workflow steps, see [pipeline-flowchart.
 
 ### 3.4 NSFW AI Model Training & Serving
 
-The NSFW classifier is a vision-language model (VLM) fine-tuned on labeled 3D model renders. Training data contains **no student data**, only 3D model renders sourced externally and labeled by annotators.
+The NSFW classifier is a vision-language model (VLM) fine-tuned on labeled 3D model renders to classify incoming prints and ensure that no inappropriate 3D files are printed in our Maker Space. The classifier categorizes incoming prints into `safe`, `not safe` and `unknown`, the grey area, which requires further review. Training data contains **no student data**, only 3D model renders sourced externally and labeled by annotators.
 
 ```mermaid
 graph LR
