@@ -1,6 +1,6 @@
 # Resources & Operational Costs
 
-This document catalogues all infrastructure, hosting solutions, subscriptions, and third-party services required to run the full 3D Western system — including the web platform and the AI/ML pipeline.
+This document catalogues all infrastructure, hosting solutions, subscriptions, and third-party services required to run the full 3D Western proof of concept system, including the web platform and the AI pipeline. The AI and pipeline's cost estimations is subject to change due to future migrations away from N8N and future AI agent integrations into the system.
 
 ---
 
@@ -17,14 +17,16 @@ This document catalogues all infrastructure, hosting solutions, subscriptions, a
 | Job queue             | Redis                | Self-hosted      | Free (open source)     |
 | Pipeline DB           | PostgreSQL           | Self-hosted      | Free (open source)     |
 | 3D slicer             | OrcaSlicer CLI       | Self-hosted      | Free (open source)     |
-| Permanent storage     | AWS S3               | Cloud (AWS)      | Pay-per-use            |
+| 3MF file storage      | AWS S3               | Cloud (AWS)      | Pay-per-use            |
 | Email                 | AWS SES              | Cloud (AWS)      | Pay-per-use            |
-| AI model training     | Beam                 | Cloud (GPU)      | Pay-per-GPU-hour       |
+| AI model training     | AWS EC2 instance (G6, P3/P4/P5)     | Cloud (GPU)      | On demand instance pricing |
 | AI dataset storage    | AWS S3               | Cloud (AWS)      | Pay-per-use            |
 | AI dataset versioning | DVC                  | Self-hosted      | Free (open source)     |
-| AI model serving      | FastAPI + vLLM       | Self-hosted / Cloud | Depends on deployment  |
+| AI model serving      | FastAPI + vLLM       | Self-hosted/Cloud | Depends on deployment  |
 
 ---
+
+> **Note:** The self-hosted services are currently accessible on the local Western network only. A networking solution to expose the platform to students outside the local network has not yet been established and requires discussion with IT.
 
 ## Self-Hosted Infrastructure
 
@@ -104,18 +106,21 @@ Training data (raw STL files, rendered images, dataset manifests) is stored in a
 
 ---
 
-### Model Training (Beam)
+### Model Training (AWS EC2)
 
-Fine-tuning is run on **Beam** (cloud GPU runtime). Training is a one-time or periodic job, not a continuous service.
+Fine-tuning is run on an **AWS EC2 GPU instance**. Training is a one-time or periodic job — the instance is started for the training run and stopped immediately after to avoid idle charges.
 
-| Cost component      | Notes                                                                              |
-| ------------------- | ---------------------------------------------------------------------------------- |
-| GPU compute         | Billed per GPU-hour. Typical VLM LoRA/QLoRA fine-tune on ~500 samples: 1–6 hours  |
-| GPU type            | A100 (80 GB) or similar recommended for VLM fine-tuning with Unsloth              |
-| Estimated cost      | ~$2–$5/GPU-hour (varies by GPU tier). A single training run: **~$10–$30**         |
-| Frequency           | One-time for initial model; re-run only if dataset is significantly updated        |
+| Cost component      | Notes                                                                                         |
+| ------------------- | --------------------------------------------------------------------------------------------- |
+| Instance family     | G6 (NVIDIA L4), P3 (V100), P4 (A100), or P5 (H100) depending on model size and VRAM needs   |
+| Recommended         | `p3.2xlarge` (1× V100 16 GB) or `g6.xlarge` (1× L4 24 GB) for LoRA/QLoRA with Unsloth       |
+| On-demand pricing   | `p3.2xlarge`: ~$3.06/hr &nbsp;·&nbsp; `g6.xlarge`: ~$0.80/hr (us-east-1, on-demand)         |
+| Spot pricing        | 60–80% discount available; suitable for fault-tolerant training jobs                         |
+| Estimated duration  | Typical VLM LoRA/QLoRA fine-tune on ~500 samples: 1–6 hours depending on instance and model  |
+| Estimated cost      | ~$1–$20 per training run (spot) · ~$3–$20 per training run (on-demand)                       |
+| Frequency           | One-time for initial model; re-run only if dataset is significantly updated                   |
 
-Benchmarking (zero-shot/few-shot inference on 500 samples per candidate model) is also run on Beam or can be run locally if hardware allows. Benchmarking is cheaper than training — inference-only passes.
+Benchmarking (zero-shot/few-shot inference on 500 samples per candidate model) is run on the same EC2 instance type or locally if hardware allows. Benchmarking is cheaper than training — inference-only passes with no gradient computation.
 
 ---
 
@@ -131,7 +136,8 @@ Unsloth AI is the fine-tuning library used to train the VLM. It is **open-source
 
 ### Model Serving (FastAPI + vLLM)
 
-The fine-tuned model is served as a microservice via FastAPI and vLLM. This can be deployed either self-hosted (on the local server if a GPU is available) or on a cloud GPU instance.
+The fine-tuned model is served as a microservice via FastAPI and vLLM. This will be deployed on a serverless GPU runtime for cost efficiency. Outlined below are other deployment
+options:
 
 | Deployment option     | Cost model                                                                       |
 | --------------------- | -------------------------------------------------------------------------------- |
@@ -139,7 +145,7 @@ The fine-tuned model is served as a microservice via FastAPI and vLLM. This can 
 | Cloud GPU (e.g. Beam, RunPod, Lambda Labs) | Pay-per-hour; ~$0.50–$2/hour for a consumer-grade GPU suitable for VLM inference |
 | Serverless inference  | Per-request billing; suitable for low-volume club usage                          |
 
-For the current scope (club-scale, low-concurrency inference), a **self-hosted deployment or a low-cost cloud GPU instance is sufficient**. The inference service only needs to be live while the pipeline is actively processing jobs.
+For the current scope (club-scale, low-concurrency inference), a **low-cost cloud GPU instance is sufficient**. The inference service currently only needs to be live when the pipeline is vetting for NSFW models.
 
 ---
 
@@ -161,8 +167,8 @@ DVC is **open-source and free**. It stores metadata/pointer files in git and pus
 | AWS S3 (application files)    | < $5                           |
 | AWS SES (email)               | < $1                           |
 | AWS S3 (AI datasets)          | $1–$5                          |
-| Beam (model training)         | $0 (one-time / periodic; not monthly) |
-| Model serving (cloud GPU)     | $0–$50 (depends on deployment choice) |
-| **Total cloud (steady state)** | **~$5–$60 / month**            |
+| AWS EC2 (model training)      | $0 (one-time / periodic; not monthly) |
+| Model serving (cloud GPU)     | $0–$30 (depends on deployment choice) |
+| **Total cloud (steady state)** | **~$5–$40 / month**            |
 
-Training costs are incurred once (or when the dataset is retrained) rather than monthly. Steady-state cloud costs are dominated by S3 storage and, if applicable, a persistent GPU instance for model serving.
+Training costs are incurred once (or when the dataset is retrained) rather than monthly for EC2 instances used for fine tuning AI models. Steady-state cloud costs consists of S3 storage and the serverless payment model for GPU usage is pay-as-you-go.
