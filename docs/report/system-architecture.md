@@ -13,6 +13,7 @@ The system is fully self-hosted and containerised. Traefik acts as the public-fa
 ```mermaid
 graph LR
     User((User))
+    ML_Hosting[AI Model <br/> **GPU Runtime**]
 
     subgraph AWS_Cloud [AWS Cloud]
         S3["S3 <br/> **Permanent File Storage** <br/> 3MF and model files"]
@@ -48,6 +49,7 @@ graph LR
 
     %% Pipeline connections
     Pipeline <--> |Read / write files| SeaweedFS
+    Pipeline --> | POSTs images to| ML_Hosting
 ```
 
 ---

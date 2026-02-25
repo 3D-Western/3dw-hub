@@ -6,11 +6,12 @@ This document is the entry point for reviewing the 3D Western dashboard. It is c
 
 ## 1. System Architecture Overview
 
-The platform is fully self-hosted and containerised on a local machine within the Western network. Traefik is the sole public ingress. File uploads use a two-stage flow — temporary staging in SeaweedFS, then permanent archival to AWS S3. All logins require mandatory email-based MFA.
+The platform is fully self-hosted and containerised on a local machine within the Western network. Traefik is the sole public ingress. File uploads use a two-stage flow: temporary staging in SeaweedFS, then permanent archival to AWS S3. All logins require mandatory email-based MFA.
 
 ```mermaid
 graph LR
     User((User))
+    ML_Hosting[AI Model <br/> **GPU Runtime**]
 
     subgraph AWS_Cloud [AWS Cloud]
         S3["S3 <br/> **Permanent File Storage** <br/> 3MF and model files"]
@@ -46,6 +47,7 @@ graph LR
 
     %% Pipeline connections
     Pipeline <--> |Read / write files| SeaweedFS
+    Pipeline --> | POSTs images to| ML_Hosting
 ```
 
 **Service roles:**
@@ -83,7 +85,7 @@ For the full service spec, deployment configuration, and cost breakdown, see [re
 
 **Publicly reachable (via Traefik on port 80):**
 - Frontend web application
-- SeaweedFS S3 endpoint — for browser-direct presigned file uploads only
+- SeaweedFS S3 endpoint for browser-direct presigned file uploads only
 
 **Internal only (unreachable from the internet):**
 - **Backend** (port 8000): accessed only by the Frontend container over `backend-network`
@@ -107,7 +109,7 @@ Every login is a mandatory two-phase process. Phase 1 validates credentials and 
 
 **Summary:**
 1. User submits student ID + password → backend validates credentials → OTP sent via AWS SES
-2. `mfaToken` cookie (15 min, HttpOnly) issued — unlocks only MFA endpoints
+2. `mfaToken` cookie (15 min, HttpOnly) issued unlocks only MFA endpoints
 3. User submits OTP → backend verifies → `sessionToken` cookie (7 days, HttpOnly) issued
 4. `mfaToken` is cleared; user redirected to dashboard
 
@@ -146,9 +148,9 @@ For the detailed pipeline flowchart and workflow steps, see [pipeline-flowchart.
 
 ---
 
-### 3.4 NSFW AI Model — Training & Serving
+### 3.4 NSFW AI Model Training & Serving
 
-The NSFW classifier is a vision-language model (VLM) fine-tuned on labeled 3D model renders. Training data contains **no student data** — only 3D model renders sourced externally and labeled by annotators.
+The NSFW classifier is a vision-language model (VLM) fine-tuned on labeled 3D model renders. Training data contains **no student data**, only 3D model renders sourced externally and labeled by annotators.
 
 ```mermaid
 graph LR
@@ -168,7 +170,7 @@ graph LR
 
 **Summary:**
 - Dataset: 1,000 labeled 3D model renders (400 NSFW, 300 SFW, 300 grey area); stored in AWS S3; versioned with DVC
-- Fine-tuning: Unsloth AI (LoRA/QLoRA) on AWS EC2 GPU instance (one-time / periodic)
+- Fine-tuning: Unsloth AI (QLoRA) on AWS EC2 GPU instance (one-time / periodic)
 - Serving: FastAPI + vLLM on an external serverless GPU runtime (Beam / RunPod)
 - The pipeline calls the inference endpoint per job; the endpoint is only required to be live during active pipeline processing
 
@@ -181,12 +183,12 @@ For the full dataset schema, training configuration, and serving setup, see [nsf
 | Store                        | Type                | Sensitive Data                                                                  | Retention                   |
 | ---------------------------- | ------------------- | ------------------------------------------------------------------------------- | --------------------------- |
 | MariaDB (self-hosted)        | Relational          | Student IDs, hashed passwords, session tokens, OTP challenge hashes, audit logs | Persistent                  |
-| SeaweedFS (self-hosted)      | Object — temporary  | Raw 3D model files (pre-validation)                                             | Until validated or rejected |
-| AWS S3 — application bucket  | Object — permanent  | Validated 3D model files, sliced output files                                   | Job lifecycle               |
-| AWS S3 — AI dataset bucket   | Object — permanent  | 3D model renders for NSFW training (no student data)                            | Dataset lifecycle           |
+| SeaweedFS (self-hosted)      | Object, temporary   | Raw 3D model files (pre-validation)                                             | Until validated or rejected |
+| AWS S3 application bucket    | Object, permanent   | Validated 3D model files, sliced output files                                   | Job lifecycle               |
+| AWS S3 AI dataset bucket     | Object permanent    | 3D model renders for NSFW training (no student data)                            | Dataset lifecycle           |
 | N8N PostgreSQL (self-hosted) | Relational          | N8N workflow execution logs                                                     | 1-week TTL for job logs     |
 | Redis (self-hosted)          | In-memory queue     | Job queue references only (no file data)                                        | Ephemeral                   |
-| AWS SES                      | Transactional email | Student email addresses (delivery only — not stored by SES)                     | Not retained                |
+| AWS SES                      | Transactional email | Student email addresses (delivery only, not stored by SES)                      | Not retained                |
 
 **MariaDB tables in scope (12 total):**
 
@@ -218,7 +220,7 @@ The following table is drawn from [authentication.md](https://github.com/3D-West
 | Mechanism                                        | Implementation                                                                                       |
 | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
 | **Password hashing**                             | BCrypt (Spring Security default cost factor)                                                         |
-| **OTP hashing**                                  | SHA-256 stored as Base64 — not BCrypt, to avoid timing side-channels                                 |
+| **OTP hashing**                                  | SHA-256 stored as Base64 (not BCrypt to avoid timing side-channels)                                  |
 | **Token hashing** (password reset, email verify) | SHA-256 stored as Base64                                                                             |
 | **Constant-time comparison**                     | `MessageDigest.isEqual()` for OTP and email verification token checks                                |
 | **User enumeration prevention**                  | Login returns identical error for unknown user and wrong password; password reset always returns 200 |
@@ -226,7 +228,7 @@ The following table is drawn from [authentication.md](https://github.com/3D-West
 | **OTP resend rate limiting**                     | Max 3 resends per 5-minute window                                                                    |
 | **Email verify resend rate limiting**            | Max 3 resends per 5-minute window                                                                    |
 | **Session fixation**                             | MFA session is deleted and a new session is created on OTP success                                   |
-| **Cookie security**                              | `HttpOnly; Secure; Path=/` — no JS access; HTTPS-only in production                                  |
+| **Cookie security**                              | `HttpOnly; Secure; Path=/`; no JS access, HTTPS-only in production                                  |
 | **CORS**                                         | Restricted to configured frontend origin only                                                        |
 | **Invite-only registration**                     | No public self-registration path                                                                     |
 | **Password reset invalidates sessions**          | All active sessions deleted on successful password reset                                             |
