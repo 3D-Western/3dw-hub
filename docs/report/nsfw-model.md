@@ -1,10 +1,10 @@
 # Overview
 
-This document details data curation, sampling, and training process for the NSFW model — a vision-language model (VLM) fine-tuned to classify 3D models as NSFW, SFW, or grey area. Images are rendered from STL files using a Python OpenSCAD script and fed into the model for classification.
+This document details data curation, sampling, and training process for the NSFW model, a vision-language model (VLM) fine-tuned to classify 3D models as NSFW, SFW, or grey area 3D files for incoming print requests. Images are rendered from STL files using a Python OpenSCAD script and fed into the model for classification.
 
 ---
 
-## Tech Stack
+## Technical Specifications 
 
 | Component             | Technology          | Purpose                                                        |
 | --------------------- | ------------------- | -------------------------------------------------------------- |
@@ -46,7 +46,7 @@ A **sample** is one 3D model (identified by a unique ID). A single sample may co
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │  Collect raw samples                                            │
-│  400 nsfw + 300 sfw + 300 grey_area = 1,000 samples            │
+│  400 nsfw + 300 sfw + 300 grey_area = 1,000 samples             │
 └──────────────────────────┬──────────────────────────────────────┘
                            │
                            ▼
@@ -60,7 +60,7 @@ A **sample** is one 3D model (identified by a unique ID). A single sample may co
                            │
                            ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  Static benchmark / validation dataset (500 samples)           │
+│  Static benchmark / validation dataset (500 samples)            │
 │  Fixed — never modified after creation                          │
 │  Version with DVC → push to S3                                  │
 └─────────────────────────────────────────────────────────────────┘

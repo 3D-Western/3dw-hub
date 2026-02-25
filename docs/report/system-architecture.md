@@ -259,7 +259,7 @@ All services run as Docker containers orchestrated with Docker Compose.
 
 ### Registration
 
-Registration is invite-only. An admin creates an invitation linked to a specific student ID. The user signs up using the invite code and their student ID must match before an account is created. Email verification is required before first login.
+Registration is currently invite-only for the alpha release and alpha testing. An admin creates an invitation linked to a specific student ID, then the user signs up using the invite code and their student ID must match before an account is created. Email verification is required before first login.
 
 ### Authentication
 
