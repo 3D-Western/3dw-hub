@@ -68,10 +68,10 @@ graph LR
 | Local Storage    | SeaweedFS    | latest  | S3-compatible temp file staging              |
 | File Storage     | AWS S3       | —       | Permanent 3D model storage                   |
 | Email            | AWS SES      | —       | Transactional email delivery                 |
-| Pipeline _(TBD)_ | N8N          | 2.3.1   | Workflow automation engine                   |
-| Pipeline _(TBD)_ | PostgreSQL   | 16.1    | N8N persistence store                        |
-| Pipeline _(TBD)_ | Redis        | 7       | N8N job queue (Bull)                         |
-| Pipeline _(TBD)_ | OrcaSlicer   | 2.3.1   | 3D model slicing                             |
+| Pipeline  | N8N          | 2.3.1   | Workflow automation engine                   |
+| Pipeline | PostgreSQL   | 16.1    | N8N persistence store                        |
+| Pipeline  | Redis        | 7       | N8N job queue (Bull)                         |
+| Pipeline  | OrcaSlicer   CLI | 2.3.1   | 3D model slicing                             |
 
 ---
 
