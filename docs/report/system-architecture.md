@@ -161,6 +161,8 @@ sequenceDiagram
     FE-->>User: Redirect to dashboard
 ```
 
+For full details on registration, email verification, MFA security mechanisms, password reset, session management, roles, and the complete API reference, see **[Authentication & Authorization](authentication.md)**.
+
 ### Job Creation (End-to-End)
 
 The full job lifecycle spans three phases: submission by the member, automated processing by the pipeline, and file retrieval by the member. File uploads use a two-stage flow — the browser uploads directly to SeaweedFS via a presigned URL; the backend validates and moves the file to permanent S3 storage, then hands the job off to the pipeline. The pipeline handles all processing and reports results back to the backend when finished.
@@ -175,7 +177,7 @@ sequenceDiagram
     participant PL as Pipeline (N8N)
     participant SES as AWS SES
 
-    rect rgb(220, 230, 245)
+    rect rgb(173, 209, 255)
         note over User, SES: Phase 1 — Job Submission
         User->>FE: Select job type + fill form (material, quantity, notes)
         FE->>BE: POST /api/v1/jobs (job metadata)
@@ -196,7 +198,7 @@ sequenceDiagram
         BE-->>FE: Job status: IN_QUEUE
     end
 
-    rect rgb(230, 245, 230)
+    rect rgb(153, 225, 153)
         note over User, SES: Phase 2 — Pipeline Processing (TBD)
         BE->>PL: Hand off job (jobId, metadata, file reference)
         BE->>BE: Update job status: PRINTING
@@ -213,7 +215,7 @@ sequenceDiagram
         SES-->>User: Job is ready for pickup / download
     end
 
-    rect rgb(245, 235, 220)
+    rect rgb(255, 195, 140)
         note over User, SES: Phase 3 — File Retrieval
         User->>FE: Open completed job
         FE->>BE: GET /api/v1/files/{id}/download
