@@ -64,7 +64,7 @@ graph LR
 | PostgreSQL                   | N8N's internal persistence store                                                      |
 | Redis                        | N8N job queue (Bull / FIFO)                                                           |
 
-For the full service spec, deployment configuration, and cost breakdown, see [resources.md](resources.md).
+For the full service spec, deployment configuration, and cost breakdown, see [resources.md](https://github.com/3D-Western/3dw-hub/blob/main/docs/report/resources.md).
 
 ---
 
@@ -95,7 +95,7 @@ For the full service spec, deployment configuration, and cost breakdown, see [re
 
 > **Note:** The backend is never directly exposed to the internet. All client requests reach the backend only via the authenticated Frontend → Backend path over the internal Docker bridge network.
 
-For the full port and network assignment table, see [system-architecture.md](system-architecture.md).
+For the full port and network assignment table, see [system-architecture.md](https://github.com/3D-Western/3dw-hub/blob/main/docs/report/system-architecture.md).
 
 ---
 
@@ -111,7 +111,7 @@ Every login is a mandatory two-phase process. Phase 1 validates credentials and 
 3. User submits OTP → backend verifies → `sessionToken` cookie (7 days, HttpOnly) issued
 4. `mfaToken` is cleared; user redirected to dashboard
 
-For the full sequence diagram, registration flow, and password reset flow, see [authentication.md](authentication.md).
+For the full sequence diagram, registration flow, and password reset flow, see [authentication.md](https://github.com/3D-Western/3dw-hub/blob/main/docs/report/authentication.md).
 
 ---
 
@@ -126,7 +126,7 @@ File uploads use a two-stage model: the browser uploads directly to SeaweedFS vi
 4. Job status updated to `IN_QUEUE`; confirmation email sent via SES
 5. Backend hands job off to pipeline; pipeline returns results; member downloads output via presigned S3 GET URL
 
-For the full end-to-end sequence diagram, see [system-architecture.md](system-architecture.md).
+For the full end-to-end sequence diagram, see [system-architecture.md](shttps://github.com/3D-Western/3dw-hub/blob/main/docs/report/system-architecture.md).
 
 ---
 
@@ -142,7 +142,7 @@ The N8N pipeline receives a job from the backend, vets the file through an NSFW 
 5. If safe → slicer profile applied, model auto-oriented (Tweaker 3), sliced (OrcaSlicer), sent to 3DQue API
 6. Pipeline POSTs job completion and output file to backend; N8N logs expire after 1-week TTL
 
-For the detailed pipeline flowchart and workflow steps, see [pipeline-flowchart.md](pipeline-flowchart.md).
+For the detailed pipeline flowchart and workflow steps, see [pipeline-flowchart.md](https://github.com/3D-Western/3dw-hub/blob/main/docs/report/pipeline-flowchart.md).
 
 ---
 
@@ -172,7 +172,7 @@ graph LR
 - Serving: FastAPI + vLLM on an external serverless GPU runtime (Beam / RunPod)
 - The pipeline calls the inference endpoint per job; the endpoint is only required to be live during active pipeline processing
 
-For the full dataset schema, training configuration, and serving setup, see [nsfw-model.md](nsfw-model.md).
+For the full dataset schema, training configuration, and serving setup, see [nsfw-model.md](https://github.com/3D-Western/3dw-hub/blob/main/docs/report/nsfw-model.md).
 
 ---
 
@@ -213,7 +213,7 @@ For the full dataset schema, training configuration, and serving setup, see [nsf
 
 ### Security Mechanisms Summary
 
-The following table is drawn from [authentication.md](authentication.md):
+The following table is drawn from [authentication.md](https://github.com/3D-Western/3dw-hub/blob/main/docs/report/authentication.md):
 
 | Mechanism                                        | Implementation                                                                                       |
 | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
@@ -301,8 +301,8 @@ The following table is drawn from [authentication.md](authentication.md):
 
 | Document | Purpose | Link |
 |---|---|---|
-| system-architecture.md | Full component specs, deployment config, Docker network table, detailed data flow sequence diagrams | [system-architecture.md](system-architecture.md) |
-| authentication.md | Complete auth/MFA/session implementation, token details, API endpoint reference | [authentication.md](authentication.md) |
-| pipeline-flowchart.md | Detailed pipeline workflow, N8N orchestration, NSFW gate, printer handoff | [pipeline-flowchart.md](pipeline-flowchart.md) |
-| nsfw-model.md | NSFW AI model training dataset, fine-tuning process, serving infrastructure | [nsfw-model.md](nsfw-model.md) |
-| resources.md | Full infrastructure service list, cost breakdown, hardware requirements | [resources.md](resources.md) |
+| system-architecture.md | Full component specs, deployment config, Docker network table, detailed data flow sequence diagrams | [system-architecture.md](https://github.com/3D-Western/3dw-hub/blob/main/docs/report/system-architecture.md) |
+| authentication.md | Complete auth/MFA/session implementation, token details, API endpoint reference | [authentication.md](https://github.com/3D-Western/3dw-hub/blob/main/docs/report/authentication.md) |
+| pipeline-flowchart.md | Detailed pipeline workflow, N8N orchestration, NSFW gate, printer handoff | [pipeline-flowchart.md](https://github.com/3D-Western/3dw-hub/blob/main/docs/report/pipeline-flowchart.md) |
+| nsfw-model.md | NSFW AI model training dataset, fine-tuning process, serving infrastructure | [nsfw-model.md](https://github.com/3D-Western/3dw-hub/blob/main/docs/report/nsfw-model.md) |
+| resources.md | Full infrastructure service list, cost breakdown, hardware requirements | [resources.md](https://github.com/3D-Western/3dw-hub/blob/main/docs/report/resources.md) |
