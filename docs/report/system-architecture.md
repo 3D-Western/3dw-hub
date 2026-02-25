@@ -26,7 +26,7 @@ graph LR
         Backend["Backend <br/> **Spring Boot** / Kotlin"]
         Database[(MariaDB)]
         SeaweedFS["SeaweedFS <br/> Temp File Storage"]
-        Pipeline["Pipeline <br/> **N8N** (TBD)"]
+        Pipeline["Pipeline <br/> **N8N**"]
     end
 
     %% Entry point
