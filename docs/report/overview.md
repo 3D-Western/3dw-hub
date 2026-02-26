@@ -145,7 +145,7 @@ File uploads use a two-stage model: the browser uploads directly to SeaweedFS vi
 4. Job status updated to `IN_QUEUE`; confirmation email sent via SES
 5. Backend hands job off to pipeline; pipeline returns results; member downloads output via presigned S3 GET URL
 
-For the full end-to-end sequence diagram, see [system-architecture.md](shttps://github.com/3D-Western/3dw-hub/blob/main/docs/report/system-architecture.md).
+For the full end-to-end sequence diagram, see [system-architecture.md](https://github.com/3D-Western/3dw-hub/blob/main/docs/report/system-architecture.md).
 
 ---
 
@@ -199,7 +199,7 @@ For the full dataset schema, training configuration, and serving setup, see [nsf
 
 | Store                        | Type                | Sensitive Data                                                                  | Retention                   |
 | ---------------------------- | ------------------- | ------------------------------------------------------------------------------- | --------------------------- |
-| MariaDB (self-hosted)        | Relational          | Student IDs, hashed passwords, session tokens, OTP challenge hashes, audit logs | Persistent                  |
+| MariaDB (self-hosted)        | Relational          | Student IDs, student emails, hashed passwords, first and last names, student faculties, session tokens, OTP challenge hashes, audit logs | Persistent                  |
 | SeaweedFS (self-hosted)      | Object, temporary   | Raw 3D model files (pre-validation)                                             | Until validated or rejected |
 | AWS S3 application bucket    | Object, permanent   | Validated 3D model files, sliced output files                                   | Job lifecycle               |
 | AWS S3 AI dataset bucket     | Object permanent    | 3D model renders for NSFW training (no student data)                            | Dataset lifecycle           |
@@ -276,7 +276,7 @@ The following table is drawn from [authentication.md](https://github.com/3D-West
 | Role          | Access                                                |
 | ------------- | ----------------------------------------------------- |
 | `Member`      | Own profile, own jobs, own file downloads only        |
-| `Admin`       | All users, all jobs, all files, invitation management |
+| `Admin`       | All users, all jobs, all files, invitation management. Only club executives can obtain this status. |
 | `MFA_PENDING` | MFA endpoints only (no full API access)               |
 | `Blacklisted` | All API access denied                                 |
 |               |                                                       |
