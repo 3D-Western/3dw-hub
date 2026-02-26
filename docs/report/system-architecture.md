@@ -74,6 +74,7 @@ graph LR
 | Pipeline | PostgreSQL   | 16.1    | N8N persistence store                        |
 | Pipeline  | Redis        | 7       | N8N job queue (Bull)                         |
 | Pipeline  | OrcaSlicer   CLI | 2.3.1   | 3D model slicing                             |
+| Operating System | Ubuntu | 22.04.5 LTS | The server computer in the Maker Space has Ubuntu Linux installed |
 
 ---
 
